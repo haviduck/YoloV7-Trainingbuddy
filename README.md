@@ -2,7 +2,7 @@
 
 ## What is this?
 
-This is `training_analyser_ai.py`, a terminal-based, animated, slightly unhinged training monitor for YOLOv7 object detection. It watches your training, chats with ChatGPT about your metrics, and (when things look grim) automatically backs up your weights so you don't lose your best model to the abyss of overfitting.
+This is `training_analyser_yolov7.py`, a terminal-based, animated, slightly unhinged training monitor for YOLOv7 object detection. It watches your training, chats with ChatGPT about your metrics, and (when things look grim) automatically backs up your weights so you don't lose your best model to the abyss of overfitting.
 
 ## How do I use it?
 
@@ -12,7 +12,7 @@ This is `training_analyser_ai.py`, a terminal-based, animated, slightly unhinged
    - Ideally, next to your `runs/train` folder so it can find your results.
 3. **Run it in your terminal:**
    ```bash
-   python training_analyser_ai.py
+   python training_analyser_yolov7.py
    ```
 4. **Enjoy the aquarium, the moving duck, and the existential dread.**
 
