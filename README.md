@@ -41,6 +41,7 @@ This is `training_analyser_ai.py`, a terminal-based, animated, slightly unhinged
 ## Apology Section
 
 > "I'm so, so sorry. This script is the result of too many late nights, too much coffee, and a desperate need to not lose my best.pt to the void. If it saves your model, great! If it doesn't, please accept this humble ASCII duck as compensation."
+![image](https://github.com/user-attachments/assets/f485f3f2-a102-4651-91c8-bc6fdc34cd36)
 
 ## Final Notes
 
