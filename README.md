@@ -1,8 +1,9 @@
-# Fishwell YOLOv7 Training Analyzer & Overfitting Backup Buddy 🦆
+# Fishwell Training Analyzer & Overfitting Backup Buddy 🦆
 
 ## What is this?
 
 This is `training_analyser_yolov7.py`, a terminal-based, animated, slightly unhinged training monitor for YOLOv7 object detection. It watches your training, chats with ChatGPT about your metrics, and (when things look grim) automatically backs up your weights so you don't lose your best model to the abyss of overfitting.
+Wouldnt it be great if it was easier to remember the naming conventions of your conda environments?
 
 ## How do I use it?
 
