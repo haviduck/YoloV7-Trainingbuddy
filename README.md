@@ -5,6 +5,9 @@
 This is `training_analyser_yolov7.py`, a terminal-based, animated, slightly unhinged training monitor for YOLOv7 object detection. It watches your training, chats with ChatGPT about your metrics, and (when things look grim) automatically backs up your weights so you don't lose your best model to the abyss of overfitting.
 Wouldnt it be great if it was easier to remember the naming conventions of your conda environments?
 
+![image](https://github.com/user-attachments/assets/b4e2003f-3553-4aca-97a4-5c9bc158668e)
+
+
 ## How do I use it?
 
 1. **Get a ChatGPT API key.**
