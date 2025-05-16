@@ -815,8 +815,8 @@ def aquarium(stdscr):
     curses.init_pair(4, curses.COLOR_WHITE, -1)   # Bubbles
     curses.init_pair(5, curses.COLOR_GREEN, -1)   # Info box border
     curses.init_pair(6, curses.COLOR_RED, -1)     # Warnings/errors
-    min_height = INFO_BOX_HEIGHT + 16
-    min_width = max(INFO_BOX_WIDTH*3 + 16, max(len(line) for line in ASCII_ART) + 4)
+    min_height = INFO_BOX_HEIGHT + 8
+    min_width = INFO_BOX_WIDTH * 3 + 8
     pause = 0.12
     map_history = []
     loss_history = []
@@ -837,6 +837,17 @@ def aquarium(stdscr):
     advice_message_time = 0
     message_display_duration = 4  # seconds
     last_key_time = time.time()
+    # In aquarium(), add a flag to track if we've already auto-backed up for this overfitting event
+    overfit_auto_backup_epoch = None
+    # Duck animation state
+    duck_art = [
+        "   __",
+        "<(o )___",
+        " ( ._> /",
+        "  `---' "
+    ]
+    duck_x = 0
+    duck_dir = 1
 
     def spawn_fish(max_x, max_y, avoid_boxes):
         for _ in range(20):
@@ -1035,37 +1046,68 @@ def aquarium(stdscr):
             if 0 <= y < max_y and 0 <= x < max_x:
                 stdscr.addstr(y, x, line[:max_x-x][:box_w-4], curses.color_pair(2))
 
-        # --- Center box drawing (fixed indentation) ---
+        # --- Center box drawing (centered, list-like) ---
         center_lines = []
         overfitting_detected = False
         if ai_feedback and not ai_feedback.get('error'):
             summary = ai_feedback.get('summary', 'No summary.')
             if ai_feedback.get('isoverfitted', False):
                 overfitting_detected = True
-            center_lines.append("AI Summary:")
-            center_lines.extend(wrap_lines([summary], box_w-4))
+                if (overfit_auto_backup_epoch != current_epoch):
+                    backup_dir = WEIGHTS_DIR
+                    if not os.path.exists(backup_dir):
+                        os.makedirs(backup_dir)
+                    latest_weight = BEST_PT if os.path.exists(BEST_PT) else None
+                    if latest_weight:
+                        backup_path = os.path.join(backup_dir, f"overfit_{int(time.time())}.pt")
+                        shutil.copy2(latest_weight, backup_path)
+                        backup_message = f"✅ Weights auto-saved to {backup_path} (overfitting)"
+                        backup_message_time = time.time()
+                        logging.info(f"Auto overfitting backup completed: {backup_path}")
+                        overfit_auto_backup_epoch = current_epoch
+                    else:
+                        backup_message = "❌ No weight file found to auto-save."
+                        backup_message_time = time.time()
+                        logging.warning("No weight file found for auto overfitting save")
+            # Center and listify summary
+            summary_lines = wrap_lines([summary], box_w-10)
+            # Add bullet points if summary has sentences
+            summary_bullets = []
+            for line in summary_lines:
+                for sent in line.split('. '):
+                    sent = sent.strip()
+                    if sent:
+                        summary_bullets.append(f"• {sent}")
+            # Add vertical padding to center
+            pad_top = (box_h - len(summary_bullets)) // 2
+            center_lines.extend([''] * pad_top)
+            for line in summary_bullets:
+                # Center horizontally
+                center_lines.append(line.center(box_w-4))
+            pad_bottom = box_h - len(center_lines)
+            center_lines.extend([''] * pad_bottom)
         elif ai_feedback and ai_feedback.get('error'):
             center_lines.append("AI Feedback unavailable.")
         elif not ai_feedback:
             center_lines.append("Waiting for AI feedback...")
         if overfitting_detected:
             center_lines.append("")
-            center_lines.append("🚨 Overfitting detected! [S] Save weights now")
+            center_lines.append("🚨 Overfitting detected! [S] Save weights now".center(box_w-4))
         center_lines.append("")
         # Show backup or advice message if set
         now = time.time()
         if backup_message and now - backup_message_time < message_display_duration:
             center_lines.append("")
-            center_lines.append(backup_message)
+            center_lines.append(backup_message.center(box_w-4))
         if advice_message and now - advice_message_time < message_display_duration:
             center_lines.append("")
-            center_lines.extend(wrap_lines([advice_message], box_w-4))
+            for l in wrap_lines([advice_message], box_w-10):
+                center_lines.append(l.center(box_w-4))
         for i in range(box_w):
             if 0 <= center_box_y-1 < max_y and 0 <= center_box_x + i < max_x:
                 stdscr.addch(center_box_y-1, center_box_x + i, ord('='), curses.color_pair(5) | curses.A_BOLD)
             if 0 <= center_box_y + box_h < max_y and 0 <= center_box_x + i < max_x:
                 stdscr.addch(center_box_y + box_h, center_box_x + i, ord('='), curses.color_pair(5) | curses.A_BOLD)
-            # Corners
         if 0 <= center_box_y-1 < max_y and 0 <= center_box_x-1 < max_x:
             stdscr.addch(center_box_y-1, center_box_x-1, ord('#'), curses.color_pair(5) | curses.A_BOLD)
         if 0 <= center_box_y-1 < max_y and 0 <= center_box_x + box_w < max_x:
@@ -1080,6 +1122,68 @@ def aquarium(stdscr):
             if 0 <= y < max_y and 0 <= x < max_x:
                 stdscr.addstr(y, x, line[:max_x-x][:box_w-4], curses.color_pair(2) | curses.A_BOLD)
         stdscr.refresh()
+
+        # --- Restore right info box drawing (add paragraph spacing) ---
+        right_lines = []
+        if ai_feedback and not ai_feedback.get('error'):
+            if ai_feedback.get('risks'):
+                right_lines.append('Risks:')
+                right_lines.extend(wrap_lines([f"- {r}" for r in ai_feedback['risks']], box_w-4))
+                right_lines.append('')
+            if ai_feedback.get('trends'):
+                right_lines.append('Trends:')
+                right_lines.extend(wrap_lines([f"- {t}" for t in ai_feedback['trends']], box_w-4))
+                right_lines.append('')
+            if ai_feedback.get('recommendations'):
+                right_lines.append('Recommendations:')
+                right_lines.extend(wrap_lines([f"* {rec}" for rec in ai_feedback['recommendations']], box_w-4))
+                right_lines.append('')
+            if ai_feedback.get('metrics'):
+                right_lines.append('Metrics:')
+                right_lines.extend(wrap_lines([f"• {m}" for m in ai_feedback['metrics']], box_w-4))
+        elif ai_feedback and ai_feedback.get('error'):
+            right_lines.append("AI Feedback unavailable.")
+        elif not ai_feedback:
+            right_lines.append("Waiting for AI feedback...")
+        # Draw right info box border and text as before
+        for i in range(box_w):
+            if 0 <= right_box_y < max_y and 0 <= right_box_x + i < max_x:
+                stdscr.addch(right_box_y, right_box_x + i, ord('-'), curses.color_pair(5))
+            if 0 <= right_box_y + box_h - 1 < max_y and 0 <= right_box_x + i < max_x:
+                stdscr.addch(right_box_y + box_h - 1, right_box_x + i, ord('-'), curses.color_pair(5))
+        for i in range(box_h):
+            if 0 <= right_box_y + i < max_y and 0 <= right_box_x < max_x:
+                stdscr.addch(right_box_y + i, right_box_x, ord('|'), curses.color_pair(5))
+            if 0 <= right_box_y + i < max_y and 0 <= right_box_x + box_w - 1 < max_x:
+                stdscr.addch(right_box_y + i, right_box_x + box_w - 1, ord('|'), curses.color_pair(5))
+        # Corners
+        if 0 <= right_box_y < max_y and 0 <= right_box_x < max_x:
+            stdscr.addch(right_box_y, right_box_x, ord('+'), curses.color_pair(5))
+        if 0 <= right_box_y < max_y and 0 <= right_box_x + box_w - 1 < max_x:
+            stdscr.addch(right_box_y, right_box_x + box_w - 1, ord('+'), curses.color_pair(5))
+        if 0 <= right_box_y + box_h - 1 < max_y and 0 <= right_box_x < max_x:
+            stdscr.addch(right_box_y + box_h - 1, right_box_x, ord('+'), curses.color_pair(5))
+        if 0 <= right_box_y + box_h - 1 < max_y and 0 <= right_box_x + box_w - 1 < max_x:
+            stdscr.addch(right_box_y + box_h - 1, right_box_x + box_w - 1, ord('+'), curses.color_pair(5))
+        # Draw right info text
+        for idx, line in enumerate(right_lines[:box_h-2]):
+            y = right_box_y + 1 + idx
+            x = right_box_x + 2
+            if 0 <= y < max_y and 0 <= x < max_x:
+                stdscr.addstr(y, x, line[:max_x-x][:box_w-4], curses.color_pair(2))
+
+        # Remove seaweed at the bottom (do not draw it)
+        # Animate duck at the bottom, moving left/right
+        duck_y = max_y - len(duck_art) - 1
+        if duck_x + len(duck_art[1]) >= max_x:
+            duck_dir = -1
+        if duck_x <= 0:
+            duck_dir = 1
+        for i, line in enumerate(duck_art):
+            if 0 <= duck_y + i < max_y and 0 <= duck_x < max_x:
+                stdscr.addstr(duck_y + i, duck_x, line[:max_x-duck_x], curses.color_pair(3))
+        duck_x += duck_dir
+
         # Handle keypresses for backup, save, and life advice
         key = stdscr.getch()
         logging.debug(f"Aquarium keypress: {key}")
@@ -1100,22 +1204,21 @@ def aquarium(stdscr):
                 backup_message_time = time.time()
                 logging.warning("No weight file found for backup")
         elif key in [ord('s'), ord('S')]:
-            if overfitting_detected:
-                logging.info("[S] key pressed for overfitting save")
-                backup_dir = WEIGHTS_DIR
-                if not os.path.exists(backup_dir):
-                    os.makedirs(backup_dir)
-                latest_weight = BEST_PT if os.path.exists(BEST_PT) else None
-                if latest_weight:
-                    backup_path = os.path.join(backup_dir, f"overfit_{int(time.time())}.pt")
-                    shutil.copy2(latest_weight, backup_path)
-                    backup_message = f"✅ Weights saved to {backup_path} (overfitting)"
-                    backup_message_time = time.time()
-                    logging.info(f"Overfitting backup completed: {backup_path}")
-                else:
-                    backup_message = "❌ No weight file found to save."
-                    backup_message_time = time.time()
-                    logging.warning("No weight file found for overfitting save")
+            logging.info("[S] key pressed for overfitting/manual save")
+            backup_dir = WEIGHTS_DIR
+            if not os.path.exists(backup_dir):
+                os.makedirs(backup_dir)
+            latest_weight = BEST_PT if os.path.exists(BEST_PT) else None
+            if latest_weight:
+                backup_path = os.path.join(backup_dir, f"manual_{int(time.time())}.pt")
+                shutil.copy2(latest_weight, backup_path)
+                backup_message = f"✅ Weights saved to {backup_path} (manual)"
+                backup_message_time = time.time()
+                logging.info(f"Manual backup completed: {backup_path}")
+            else:
+                backup_message = "❌ No weight file found to save."
+                backup_message_time = time.time()
+                logging.warning("No weight file found for manual save")
         elif key in [ord('l'), ord('L')]:
             logging.info("[L] key pressed for life advice")
             advice_prompt = (
